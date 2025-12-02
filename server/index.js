@@ -1,7 +1,9 @@
+
 // server/index.js
 const express = require('express');
 const path = require('path');
 const db = require('./db');
+const marked = require('marked');
 
 const app = express();
 const PORT = 3000;
@@ -175,9 +177,9 @@ async function renderHomePage(req, res) {
 async function renderArticlePage(req, res, articleId) {
   try {
     let pageContent = '';
-    
+    let rows = [];
     try {
-      const [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [articleId]);
+      [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [articleId]);
       
       if (rows.length > 0) {
         const article = rows[0];
@@ -186,7 +188,7 @@ async function renderArticlePage(req, res, articleId) {
           <h1>${escapeHTML(article.title)}</h1>
           <p class="article-meta">发布时间: ${new Date(article.created_at).toLocaleString()}</p>
           <div class="content">
-            ${article.content.split('\n').map(p => `<p>${escapeHTML(p)}</p>`).join('')}
+            ${article.content_markdown ? marked(article.content_markdown) : article.content.split('\n').map(p => `<p>${escapeHTML(p)}</p>`).join('')}
           </div>
           <a href="/" class="back-link">返回首页</a>
         `;

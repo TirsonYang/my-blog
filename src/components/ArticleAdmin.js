@@ -1,11 +1,13 @@
 // src/components/ArticleAdmin.js
 import React, { useState, useEffect } from 'react';
 import './ArticleAdmin.css';
+import MDEditor from '@uiw/react-md-editor';
+
 
 function ArticleAdmin() {
   const [articles, setArticles] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ title: '', content: '' });
+  const [formData, setFormData] = useState({ title: '', content: '',markdown: '' });
   const [editingId, setEditingId] = useState(null);
   const [aiSuggestion, setAiSuggestion] = useState('');
 
@@ -32,37 +34,62 @@ function ArticleAdmin() {
   // AI 写作助手（简化版）
   const generateAIContent = async () => {
     if (!formData.title.trim()) {
-      alert('请先输入标题');
-      return;
-    }
+    alert('请先输入标题');
+    return;
+  }
 
-    try {
-      // 模拟 AI 生成内容
-      const suggestions = [
-        `关于"${formData.title}"，我们可以探讨其历史背景、现状分析和未来展望。`,
-        `"${formData.title}"是一个值得深入讨论的话题，涉及多个方面的考量。`,
-        `本文将从不同角度分析"${formData.title}"，为读者提供全面的视角。`,
-        `在当今社会，"${formData.title}"已经成为人们关注的热点话题。`
-      ];
+  try {
+    setAiSuggestion('🤖 AI正在思考中，请稍候...');
+    
+    const response = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: formData.title,
+        keywords: '' // 可以留空，或者添加关键词输入
+      }),
+    });
+
+    const result = await response.json();
+    
+    if (result.success) {
+      let suggestionText = `AI建议: ${result.data.content}`;
       
-      const randomSuggestion = suggestions[Math.floor(Math.random() * suggestions.length)];
-      setAiSuggestion(randomSuggestion);
+      // 显示使用的服务
+      if (result.data.service === 'fallback') {
+        suggestionText += ' (备用方案)';
+      } else if (result.data.service === 'baidu-ernie') {
+        suggestionText += ' (百度文心一言)';
+      }
+      
+      if (result.data.note) {
+        suggestionText += ` - ${result.data.note}`;
+      }
+      
+      setAiSuggestion(suggestionText);
       
       // 自动填充到内容框
       setFormData(prev => ({
         ...prev,
-        content: randomSuggestion
+        content: result.data.content
       }));
-    } catch (error) {
-      console.error('AI 生成失败:', error);
+      
+    } else {
+      throw new Error(result.error || 'AI生成失败');
     }
+  } catch (error) {
+    console.error('AI生成失败:', error);
+    setAiSuggestion('❌ AI服务暂时不可用，请手动输入内容或稍后重试');
+  }
   };
 
   // 创建或更新文章
   const saveArticle = async (e) => {
     e.preventDefault();
-    if (!formData.title.trim() || !formData.content.trim()) {
-      alert('标题和内容不能为空');
+    if (!formData.title.trim() || !formData.markdown.trim()) {
+      alert('标题和Markdown内容不能为空');
       return;
     }
 
@@ -70,12 +97,18 @@ function ArticleAdmin() {
       const url = editingId ? `/api/articles/${editingId}` : '/api/articles';
       const method = editingId ? 'PUT' : 'POST';
 
+      const articleData = {
+        title: formData.title,
+        content: formData.content,
+        markdown: formData.markdown
+      }
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(articleData),
       });
 
       const result = await response.json();
@@ -105,7 +138,8 @@ function ArticleAdmin() {
       if (result.success) {
         setFormData({
           title: result.data.title,
-          content: result.data.content
+          content: result.data.content,
+          markdown: result.data.content_markdown
         });
         setEditingId(article.id);
         setAiSuggestion('');
@@ -114,6 +148,8 @@ function ArticleAdmin() {
       console.error('获取文章详情失败:', error);
     }
   };
+
+
 
   // 删除文章 - 修复了 confirm 问题
   const deleteArticle = async (id) => {
@@ -162,15 +198,22 @@ function ArticleAdmin() {
               />
             </div>
 
-            <div className="form-group">
-              <label>内容:</label>
-              <textarea
-                value={formData.content}
-                onChange={(e) => setFormData({...formData, content: e.target.value})}
-                placeholder="输入文章内容"
-                rows="10"
+            <div className="form-group" data-color-mode="light">
+              <label>博客内容（支持Markdown语法）:</label>
+              {/* 这就是我们的新“魔法写字板” */}
+              <MDEditor
+                value={formData.markdown} // 它显示和编辑的是markdown源码
+                onChange={(value) => {
+                  setFormData({...formData, markdown: value});
+                }}
+                height={400} // 写字板的高度
+                preview="live" // 模式：实时预览
               />
-            </div>
+              {/* 下面是一行小提示 */}
+              <p style={{fontSize: '12px', color: '#666', marginTop: '5px'}}>
+                提示：在左边用 # 创建标题，用 ** 加粗文字，回车即可看到效果。
+              </p>
+          </div>
 
             {/* AI 写作助手 */}
             <div className="ai-assistant">

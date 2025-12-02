@@ -3,6 +3,7 @@ const express = require('express');
 const path = require('path');
 const db = require('./db');
 const { client, connectRedis } = require('./redis');
+const baiduAI = require('./baidu-ai');
 
 const app = express();
 const PORT = 3000;
@@ -73,7 +74,7 @@ app.get('/api/articles', async (req, res) => {
     try {
       cachedArticles = await client.get('articles');
     } catch (redisError) {
-      console.log('⚠️ Redis 错误，跳过缓存');
+      console.log('⚠️ Redis 错误，跳过缓存',redisError);
     }
     
     if (cachedArticles) {
@@ -92,7 +93,7 @@ app.get('/api/articles', async (req, res) => {
     try {
       await client.setEx('articles', 300, JSON.stringify(rows));
     } catch (redisError) {
-      console.log('⚠️ Redis 存储失败，跳过缓存');
+      console.log('⚠️ Redis 存储失败，跳过缓存',redisError);
     }
     
     console.log(`✅ 找到 ${rows.length} 篇文章，已缓存到 Redis`);
@@ -129,7 +130,11 @@ app.get('/api/articles/:id', async (req, res) => {
     }
     
     console.log(`📖 从数据库获取文章详情，ID: ${articleId}`);
-    const [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [articleId]);
+
+    const [rows] = await db.query(
+      'SELECT id, title, content, content_markdown, created_at FROM articles WHERE id=?',
+      [articleId]
+    );
     
     if (rows.length === 0) {
       return res.status(404).json({
@@ -162,13 +167,13 @@ app.get('/api/articles/:id', async (req, res) => {
 app.put('/api/articles/:id', async (req, res) => {
   try {
     const articleId = req.params.id;
-    const { title, content } = req.body;
+    const { title, content,markdown} = req.body;
     
     console.log(`✏️ 正在更新文章，ID: ${articleId}`);
     
     const [result] = await db.query(
-      'UPDATE articles SET title = ?, content = ? WHERE id = ?',
-      [title, content, articleId]
+      'UPDATE articles SET title = ?, content = ?,content_markdown = ? WHERE id = ?',
+      [title, content, markdown || '', articleId]
     );
     
     if (result.affectedRows === 0) {
@@ -206,19 +211,20 @@ app.put('/api/articles/:id', async (req, res) => {
 // 创建文章 - POST 路由
 app.post('/api/articles', async (req, res) => {
   try {
-    const { title, content } = req.body;
+    const { title, content,markdown } = req.body;
     console.log('🆕 正在创建新文章:', title);
     
-    if (!title || !content) {
+    if (!title || !markdown) {
       return res.status(400).json({
         success: false,
-        error: '标题和内容不能为空'
+        error: '标题和Markdown内容不能为空'
       });
     }
-    
+
     const [result] = await db.query(
-      'INSERT INTO articles (title, content) VALUES (?, ?)',
-      [title, content]
+      // 语句改成存三个值
+      'INSERT INTO articles (title, content, content_markdown) VALUES (?, ?, ?)',
+      [title, content, markdown || ''] // 第三个值就是Markdown源码，如果没有就存空字符串
     );
     
     console.log(`✅ 文章创建成功，ID: ${result.insertId}`);
@@ -234,7 +240,8 @@ app.post('/api/articles', async (req, res) => {
       data: {
         id: result.insertId,
         title,
-        content
+        content,
+        markdown
       }
     });
   } catch (error) {
@@ -282,6 +289,49 @@ app.delete('/api/articles/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       error: '删除文章失败'
+    });
+  }
+});
+
+
+// AI 写作助手 API - 使用百度文心一言
+app.post('/api/ai/generate', async (req, res) => {
+  try {
+    const { title, keywords } = req.body;
+    
+    if (!title) {
+      return res.status(400).json({
+        success: false,
+        error: '请提供标题'
+      });
+    }
+    
+    console.log(`🤖 接收到AI生成请求 - 标题: "${title}"`);
+    
+    // 调用百度AI生成内容
+    const aiContent = await baiduAI.generateContent(title, keywords);
+    
+    res.json({
+      success: true,
+      data: {
+        content: aiContent,
+        service: 'baidu-ernie'
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ AI生成接口错误:', error);
+    
+    // 终极降级方案
+    const fallbackContent = `关于"${req.body.title}"，这是一个值得深入探讨的话题。在当前背景下，我们需要从多个维度来理解这一问题。`;
+    
+    res.json({
+      success: true,
+      data: {
+        content: fallbackContent,
+        service: 'fallback',
+        note: 'AI服务暂时不可用，已使用备用方案'
+      }
     });
   }
 });

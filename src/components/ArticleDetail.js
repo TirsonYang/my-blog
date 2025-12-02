@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import './ArticleDetail.css';
+import {marked} from 'marked';
 
 function ArticleDetail() {
   const [article, setArticle] = useState(null);
@@ -61,6 +62,13 @@ function ArticleDetail() {
     );
   }
 
+  // 新增：一个简单的HTML消毒函数（防止XSS攻击，对于博客内容基本够用）
+  const sanitizeHtml = (html) => {
+    const div = document.createElement('div');
+    div.textContent = html;
+    return div.innerHTML;
+  };
+
   // 显示文章详情
   return (
     <div className="article-detail">
@@ -83,9 +91,25 @@ function ArticleDetail() {
 
       <div className="article-content">
         <div className="content">
-          {article.content.split('\n').map((paragraph, index) => (
-            <p key={index}>{paragraph}</p>
-          ))}
+          {article.content_markdown ? (
+          // 情况1：文章有Markdown源码，优先使用它来渲染
+          <div 
+            className="markdown-body"
+            dangerouslySetInnerHTML={{ 
+              __html: marked(sanitizeHtml(article.content_markdown)) 
+            }} 
+          />
+        ) : article.content ? (
+          // 情况2：没有Markdown但有旧版纯文本内容，按原方式显示
+          <div>
+            {article.content.split('\n').map((paragraph, index) => (
+              <p key={index}>{paragraph}</p>
+            ))}
+          </div>
+        ) : (
+          // 情况3：两个字段都为空（不应该发生，但容错处理）
+          <p className="no-content">这篇文章还没有内容。</p>
+        )}
         </div>
       </div>
 
