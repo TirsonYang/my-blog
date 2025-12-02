@@ -15,10 +15,3 @@
 2.  创建MySQL数据库，导入表结构
 3.  构建前端：`npm run build`
 4.  启动服务：`npm run dev`
-
-## 项目结构
-my-blog-ssr/
-├── src/               # React前端源码
-├── server/            # Express后端源码
-├── build/             # 构建后的前端文件
-└── README.md          # 本文档
