@@ -1,16 +1,34 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { useSSRData } from '../SSRContext';
+import axios from 'axios';
 import './ArticleDetail.css';
 import {marked} from 'marked';
 
 function ArticleDetail() {
-  const [article, setArticle] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const ssrData = useSSRData();
   const { id } = useParams();
+  
+  const initialArticle = (ssrData && ssrData.article && String(ssrData.article.id) === String(id)) 
+    ? ssrData.article 
+    : null;
+
+  const [article, setArticle] = useState(initialArticle);
+  const [loading, setLoading] = useState(initialArticle ? false : true);
+  
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
+    if (isFirstRender.current) {
+        isFirstRender.current = false;
+        if (article) {
+            return;
+        }
+    }
+
     async function fetchArticle() {
       try {
+        setLoading(true);
         console.log(`正在加载文章详情，ID: ${id}`);
         const response = await fetch(`/api/articles/${id}`);
         const result = await response.json();
@@ -59,6 +77,15 @@ function ArticleDetail() {
   }
 
   const sanitizeHtml = (html) => {
+    if (typeof document === 'undefined') {
+      // Simple server-side escaping
+      return html
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
     const div = document.createElement('div');
     div.textContent = html;
     return div.innerHTML;
@@ -113,5 +140,11 @@ function ArticleDetail() {
     </div>
   );
 }
+
+ArticleDetail.loadData = async (match) => {
+    const { id } = match.params;
+    const response = await axios.get(`http://localhost:3000/api/articles/${id}`);
+    return { article: response.data.data };
+};
 
 export default ArticleDetail;

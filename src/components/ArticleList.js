@@ -1,16 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useSSRData } from '../SSRContext';
+import axios from 'axios';
 import './ArticleList.css';
 
 function ArticleList() {
-  const [articles, setArticles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const ssrData = useSSRData();
+  const [articles, setArticles] = useState(ssrData && ssrData.articles ? ssrData.articles : []);
+  const [loading, setLoading] = useState(ssrData && ssrData.articles ? false : true);
   const [refreshKey, setRefreshKey] = useState(0);
 
 
   useEffect(() => {
-    async function fetchArticles() {
+    if (loading || refreshKey > 0) {
+       fetchArticles();
+    }
+  }, [refreshKey]);
+  
+  const isFirstRender = React.useRef(true);
+
+  useEffect(() => {
+      if (isFirstRender.current) {
+          isFirstRender.current = false;
+          if (articles.length > 0) {
+              return;
+          }
+      }
+      fetchArticles();
+  }, [refreshKey]);
+
+  async function fetchArticles() {
       try {
+        setLoading(true);
         console.log('正在查询文章列表...');
         const response = await fetch('/api/articles');
         const result = await response.json();
@@ -27,9 +48,6 @@ function ArticleList() {
         setLoading(false);
       }
     }
-
-    fetchArticles();
-  }, [refreshKey]);
 
   const refreshArticles = () => {
     setRefreshKey(prev => prev + 1);
@@ -95,5 +113,12 @@ function ArticleList() {
     </div>
   );
 }
+
+ArticleList.loadData = async () => {
+  const response = await axios.get('http://localhost:3000/api/articles');
+  return {
+    articles: response.data.data
+  };
+};
 
 export default ArticleList;

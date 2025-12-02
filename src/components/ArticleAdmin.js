@@ -1,17 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSSRData } from '../SSRContext';
+import axios from 'axios';
 import './ArticleAdmin.css';
 import MDEditor from '@uiw/react-md-editor';
-import OpenAI from 'OpenAI';
 
 
 function ArticleAdmin() {
-  const [articles, setArticles] = useState([]);
+  const ssrData = useSSRData();
+  const [articles, setArticles] = useState(ssrData && ssrData.adminArticles ? ssrData.adminArticles : []);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({ title: '', content: '',markdown: '' });
   const [editingId, setEditingId] = useState(null);
   const [aiSuggestion, setAiSuggestion] = useState('');
+  const [isMounted, setIsMounted] = useState(false);
+  
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
+    setIsMounted(true);
     const savedDraft = localStorage.getItem('blog_draft');
     if (savedDraft) {
       try {
@@ -32,6 +38,13 @@ function ArticleAdmin() {
         console.error('恢复草稿时出错，数据可能损坏:', e);
         localStorage.removeItem('blog_draft');
       }
+    }
+    
+    if (isFirstRender.current) {
+        isFirstRender.current = false;
+        if (articles.length > 0) {
+            return;
+        }
     }
     fetchArticles();
   }, []);
@@ -88,10 +101,10 @@ function ArticleAdmin() {
       
       setAiSuggestion(suggestionText);
       
-      setFormData(prev => ({
-        ...prev,
-        content: result.data.content
-      }));
+      // setFormData(prev => ({
+      //   ...prev,
+      //   content: result.data.content
+      // }));
       
     } else {
       throw new Error(result.error || 'AI生成失败');
@@ -102,29 +115,40 @@ function ArticleAdmin() {
   }
   };
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (formData.title.trim() || formData.markdown.trim()) {
+        const draft = {
+          title: formData.title,
+          markdown: formData.markdown,
+          lastSaved: new Date().toLocaleString('zh-CN')
+        };
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('blog_draft', JSON.stringify(draft));
+          console.log('草稿已自动保存');
+        }
+      }
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [formData.title, formData.markdown]);
+
   const saveToDraft = () => {
-    if (formData.title.trim() || formData.markdown.trim()) {
-      const draft = {
-        title: formData.title,
-        markdown: formData.markdown,
-        lastSaved: new Date().toLocaleString('zh-CN')
-      };
-      localStorage.setItem('blog_draft', JSON.stringify(draft));
-      console.log('📝 草稿已自动保存');
-    }
+     if (formData.title.trim() || formData.markdown.trim()) {
+       const draft = {
+         title: formData.title,
+         markdown: formData.markdown,
+         lastSaved: new Date().toLocaleString('zh-CN')
+       };
+       if (typeof window !== 'undefined') {
+         localStorage.setItem('blog_draft', JSON.stringify(draft));
+         console.log('草稿已手动保存');
+         alert('草稿已保存');
+       }
+     } else {
+        alert('没有内容可保存');
+     }
   };
-
-  const debouncedSaveDraft = (() => {
-    let timer = null;
-    return () => {
-      if (timer) clearTimeout(timer);
-      timer = setTimeout(saveToDraft, 2000);
-    };
-  })();
-
-  useEffect(()=>{
-    debouncedSaveDraft();
-  },[formData.title, formData.markdown]);
 
   const saveArticle = async (e) => {
     e.preventDefault();
@@ -239,14 +263,20 @@ function ArticleAdmin() {
 
             <div className="form-group" data-color-mode="light">
               <label>内容:</label>
-              <MDEditor
-                value={formData.markdown}
-                onChange={(value) => {
-                  setFormData({...formData, markdown: value});
-                }}
-                height={400}
-                preview="live"
-              />
+              {isMounted ? (
+                <MDEditor
+                  value={formData.markdown}
+                  onChange={(value) => {
+                    setFormData({...formData, markdown: value});
+                  }}
+                  height={400}
+                  preview="live"
+                />
+              ) : (
+                 <div style={{height: 400, border: '1px solid #ddd', borderRadius: 4, padding: 12, backgroundColor: '#fff'}}>
+                    正在加载编辑器...
+                 </div>
+              )}
           </div>
 
             <div className="ai-assistant">
@@ -381,5 +411,17 @@ function ArticleAdmin() {
     </div>
   );
 }
+
+ArticleAdmin.loadData = async () => {
+  try {
+    const response = await axios.get('http://localhost:3000/api/articles');
+    return {
+      adminArticles: response.data.data
+    };
+  } catch (e) {
+    console.error(e);
+    return { adminArticles: [] };
+  }
+};
 
 export default ArticleAdmin;

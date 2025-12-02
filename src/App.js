@@ -1,21 +1,17 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import ArticleList from './components/ArticleList';
-import ArticleDetail from './components/ArticleDetail';
-import ArticleAdmin from './components/ArticleAdmin';
+import { Routes, Route } from 'react-router-dom';
+import routes from './routes';
 import './App.css';
 
 function App() {
   return (
-    <Router>
       <div className="App">
         <Routes>
-          <Route path="/" element={<ArticleList />} />
-          <Route path="/article/:id" element={<ArticleDetail />} />
-          <Route path="/admin" element={<ArticleAdmin />} />
+          {routes.map(({ path, component: Component }) => (
+            <Route key={path} path={path} element={<Component />} />
+          ))}
         </Routes>
       </div>
-    </Router>
   );
 }
 
