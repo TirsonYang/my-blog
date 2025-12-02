@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './ArticleAdmin.css';
 import MDEditor from '@uiw/react-md-editor';
+import OpenAI from 'OpenAI';
 
 
 function ArticleAdmin() {
@@ -57,7 +58,8 @@ function ArticleAdmin() {
   }
 
   try {
-    setAiSuggestion('AI正在思考中，请稍候...');
+    setAiSuggestion('思考中，请稍候...');
+
     
     const response = await fetch('/api/ai/generate', {
       method: 'POST',
@@ -76,8 +78,8 @@ function ArticleAdmin() {
       let suggestionText = `AI建议: ${result.data.content}`;
       if (result.data.service === 'fallback') {
         suggestionText = suggestionText +' (备用方案)';
-      } else if (result.data.service === 'baidu-ernie') {
-        suggestionText = suggestionText +' (百度文心一言)';
+      } else if (result.data.service === 'deepseek') {
+        suggestionText = suggestionText +' (deepseek)';
       }
       
       if (result.data.note) {

@@ -2,7 +2,8 @@ const express = require('express');
 const path = require('path');
 const db = require('./db');
 const { client, connectRedis } = require('./redis');
-const baiduAI = require('./baidu-ai');
+const OpenAI = require('openai');
+require('dotenv').config();
 
 const app = express();
 const PORT = 3000;
@@ -291,13 +292,26 @@ app.post('/api/ai/generate', async (req, res) => {
     console.log(`接收到AI生成请求 - 标题: "${title}"`);
     
     // 调用AI 发送请求
-    const aiContent = await baiduAI.generateContent(title, keywords);
+    // const aiContent = await baiduAI.generateContent(title, keywords);
+
+    const openai = new OpenAI({
+      baseURL: 'https://api.deepseek.com',
+      apiKey: process.env.DEEPSEEK_API_KEY,
+    });
+
+    const chatComletion = await openai.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: '你是一个专业的博客文章作者，请根据提供的标题生成一篇完整的博客文章。' },
+        { role: 'user', content: `请根据提供的标题生成一篇完整的博客文章：${title},不超过200字` },
+      ],
+    });
     
     res.json({
       success: true,
       data: {
-        content: aiContent,
-        service: 'baidu-ernie'
+        content: chatComletion.choices[0].message.content,
+        service: 'deepseek'
       }
     });
     
