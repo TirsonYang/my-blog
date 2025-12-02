@@ -1,5 +1,3 @@
-
-// server/index.js
 const express = require('express');
 const path = require('path');
 const db = require('./db');
@@ -8,11 +6,9 @@ const marked = require('marked');
 const app = express();
 const PORT = 3000;
 
-// 中间件
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../build')));
 
-// API 路由 - 保持不变
 app.get('/api/test', async (req, res) => {
   try {
     const [rows] = await db.query('SELECT NOW() AS `current_time`');
@@ -27,16 +23,16 @@ app.get('/api/test', async (req, res) => {
 
 app.get('/api/articles', async (req, res) => {
   try {
-    console.log('📝 正在获取文章列表...');
+    console.log('正在获取文章列表...');
     const [rows] = await db.query('SELECT id, title, created_at FROM articles ORDER BY created_at DESC');
     
-    console.log(`✅ 找到 ${rows.length} 篇文章`);
+    console.log(`找到 ${rows.length} 篇文章`);
     res.json({
       success: true,
       data: rows
     });
   } catch (error) {
-    console.error('❌ 获取文章列表失败:', error);
+    console.error('获取文章列表失败:', error);
     res.status(500).json({
       success: false,
       error: '获取文章失败'
@@ -47,7 +43,7 @@ app.get('/api/articles', async (req, res) => {
 app.get('/api/articles/:id', async (req, res) => {
   try {
     const articleId = req.params.id;
-    console.log(`📖 正在获取文章详情，ID: ${articleId}`);
+    console.log(`正在获取文章详情，ID: ${articleId}`);
     
     const [rows] = await db.query('SELECT * FROM articles WHERE id = ?', [articleId]);
     
@@ -58,13 +54,13 @@ app.get('/api/articles/:id', async (req, res) => {
       });
     }
     
-    console.log('✅ 成功获取文章详情');
+    console.log('成功获取文章详情');
     res.json({
       success: true,
       data: rows[0]
     });
   } catch (error) {
-    console.error('❌ 获取文章详情失败:', error);
+    console.error('获取文章详情失败:', error);
     res.status(500).json({
       success: false,
       error: '获取文章详情失败'
@@ -72,11 +68,11 @@ app.get('/api/articles/:id', async (req, res) => {
   }
 });
 
-// 其他 CRUD API 保持不变
+// 新增
 app.post('/api/articles', async (req, res) => {
   try {
     const { title, content } = req.body;
-    console.log('🆕 正在创建新文章:', title);
+    console.log('正在创建新文章:', title);
     
     if (!title || !content) {
       return res.status(400).json({
@@ -90,7 +86,7 @@ app.post('/api/articles', async (req, res) => {
       [title, content]
     );
     
-    console.log(`✅ 文章创建成功，ID: ${result.insertId}`);
+    console.log(`文章创建成功，ID: ${result.insertId}`);
     res.json({
       success: true,
       data: {
@@ -100,7 +96,7 @@ app.post('/api/articles', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ 创建文章失败:', error);
+    console.error('创建文章失败:', error);
     res.status(500).json({
       success: false,
       error: '创建文章失败'
@@ -108,27 +104,22 @@ app.post('/api/articles', async (req, res) => {
   }
 });
 
-// 🆕 明确的页面路由（避免通配符问题）
 
-// 首页路由
 app.get('/', async (req, res) => {
-  console.log('🌐 SSR: 首页请求');
+  console.log('SSR: 首页请求');
   await renderHomePage(req, res);
 });
 
-// 文章详情页路由
 app.get('/article/:id', async (req, res) => {
-  console.log(`🌐 SSR: 文章详情请求，ID: ${req.params.id}`);
+  console.log(`SSR: 文章详情请求，ID: ${req.params.id}`);
   await renderArticlePage(req, res, req.params.id);
 });
 
-// 其他所有页面路由 - 返回客户端渲染
 app.get('*', (req, res) => {
   console.log(`🌐 客户端渲染: ${req.url}`);
   res.sendFile(path.join(__dirname, '../build/index.html'));
 });
 
-// 🆕 首页渲染函数
 async function renderHomePage(req, res) {
   try {
     let pageContent = '';
@@ -168,7 +159,7 @@ async function renderHomePage(req, res) {
     res.send(html);
     
   } catch (error) {
-    console.error('❌ 首页 SSR 失败，降级到客户端渲染:', error);
+    console.error('首页 SSR 失败，降级到客户端渲染:', error);
     res.sendFile(path.join(__dirname, '../build/index.html'));
   }
 }
@@ -212,12 +203,11 @@ async function renderArticlePage(req, res, articleId) {
     res.send(html);
     
   } catch (error) {
-    console.error('❌ 文章详情页 SSR 失败，降级到客户端渲染:', error);
+    console.error('文章详情页 SSR 失败，降级到客户端渲染:', error);
     res.sendFile(path.join(__dirname, '../build/index.html'));
   }
 }
 
-// 🆕 创建 HTML 页面的通用函数
 function createHTMLPage(title, content) {
   return `
     <!DOCTYPE html>
@@ -317,7 +307,6 @@ function createHTMLPage(title, content) {
   `;
 }
 
-// HTML 转义函数
 function escapeHTML(text) {
   if (typeof text !== 'string') return text;
   return text
@@ -330,8 +319,5 @@ function escapeHTML(text) {
 
 // 启动服务器
 app.listen(PORT, () => {
-  console.log(`🚀 服务器运行在 http://localhost:${PORT}`);
-  console.log('✅ 终极修复版 SSR 已启用！');
-  console.log('📖 访问 http://localhost:3000 测试效果');
-  console.log('💡 这次应该没有路由错误了！');
+  console.log(`服务器运行在 http://localhost:${PORT}`);
 });

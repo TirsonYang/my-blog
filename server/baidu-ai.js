@@ -1,4 +1,3 @@
-// server/baidu-ai.js - 百度文心一言集成
 const axios = require('axios');
 
 class BaiduAI {
@@ -9,53 +8,44 @@ class BaiduAI {
     this.tokenExpireTime = null;
   }
 
-  // 获取访问令牌（就像拿到入场券）
+  // 获取访问令牌
   async getAccessToken() {
-    // 检查令牌是否还有效
+    // 检查令牌时效
     if (this.accessToken && this.tokenExpireTime && Date.now() < this.tokenExpireTime) {
       return this.accessToken;
     }
 
     try {
-      console.log('🔑 正在获取百度AI访问令牌...');
+      console.log('正在获取百度AI访问令牌...');
       
       const response = await axios.post(
-        // `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${this.apiKey}&client_secret=${this.secretKey}`
-
         `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${this.apiKey}&client_secret=${this.secretKey}`
-
       );
 
       if (response.data && response.data.access_token) {
         this.accessToken = response.data.access_token;
-        // 令牌有效期为30天，我们设置为29天重新获取
+        // 令牌搁29天重新获取
         this.tokenExpireTime = Date.now() + (29 * 24 * 60 * 60 * 1000);
         
-        console.log('✅ 百度AI访问令牌获取成功');
+        console.log('访问令牌获取成功');
         return this.accessToken;
       } else {
         throw new Error('获取访问令牌失败: ' + JSON.stringify(response.data));
       }
     } catch (error) {
-      console.error('❌ 获取百度AI访问令牌失败:', error);
+      console.error('获取百度AI访问令牌失败:', error);
       throw error;
     }
   }
 
-  // 调用文心一言生成内容
   async generateContent(title, keywords = '') {
     try {
       const token = await this.getAccessToken();
       
-      console.log(`🤖 百度AI正在为标题生成内容: "${title}"`);
+      console.log(`百度AI正在为标题生成内容: "${title}"`);
       
-      // 构建提示词
-      const prompt = `请根据以下标题生成一篇博客文章的开头段落，要求语言生动有趣，长度在200字左右，适合博客阅读：
-
-标题：${title}
-${keywords ? `关键词：${keywords}` : ''}
-
-请直接生成文章内容，不要解释或添加额外说明。`;
+      // 提示词
+      const prompt = `请根据以下标题生成一篇博客文章的开头段落，要求语言生动有趣，长度在200字左右，适合博客阅读：标题：${title}，${keywords ? `关键词：${keywords}` : ''}`;
 
       const response = await axios.post(
         'https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=' + token,
@@ -66,7 +56,7 @@ ${keywords ? `关键词：${keywords}` : ''}
               content: prompt
             }
           ],
-          temperature: 0.8, // 创造性程度（0-1）
+          temperature: 0.8, 
           top_p: 0.8,
           penalty_score: 1.0
         },
@@ -78,20 +68,18 @@ ${keywords ? `关键词：${keywords}` : ''}
       );
 
       if (response.data && response.data.result) {
-        console.log('✅ 百度AI内容生成成功');
+        console.log('百度AI内容生成成功');
         return response.data.result;
       } else {
         throw new Error('AI生成失败: ' + JSON.stringify(response.data));
       }
     } catch (error) {
-      console.error('❌ 百度AI生成失败:', error.message);
+      console.error('百度AI生成失败:', error.message);
       
-      // 降级方案：返回智能模拟内容
       return this.getFallbackContent(title, keywords);
     }
   }
 
-  // 智能降级方案（如果AI服务不可用）
   getFallbackContent(title, keywords = '') {
     console.log('🔄 使用智能降级内容生成');
     
@@ -117,7 +105,5 @@ ${keywords ? `关键词：${keywords}` : ''}
     return randomTemplate + ' ' + randomEnhancement;
   }
 }
-
-// 创建单例实例
 const baiduAI = new BaiduAI();
 module.exports = baiduAI;
