@@ -198,6 +198,46 @@
   color: #666;
 }
 
+/* 草稿箱控制面板样式 */
+.draft-controls {
+  margin: 20px 0;
+  padding: 15px;
+  border: 1px dashed #4CAF50;
+  border-radius: 5px;
+  background-color: #f9f9f9;
+}
+
+.draft-controls h4 {
+  margin-top: 0;
+  color: #2E7D32;
+}
+
+.draft-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.btn-draft {
+  background-color: #2196F3 !important; /* 蓝色 */
+}
+
+.btn-clear {
+  background-color: #f44336 !important; /* 红色 */
+}
+
+.btn-save {
+  background-color: #4CAF50 !important; /* 绿色 */
+}
+
+.draft-hint {
+  font-size: 12px;
+  color: #666;
+  margin: 5px 0 0 0;
+  font-style: italic;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .admin-layout {

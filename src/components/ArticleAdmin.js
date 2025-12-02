@@ -13,6 +13,35 @@ function ArticleAdmin() {
 
   // 加载文章列表
   useEffect(() => {
+    // 🆕 新增的“开门问候”逻辑开始 -----------------
+    const savedDraft = localStorage.getItem('blog_draft');
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        // 友好地询问用户
+        const shouldRestore = window.confirm(
+          `发现上次未保存的草稿：“${draft.title || '无标题'}”\n（保存于: ${draft.lastSaved}）\n是否恢复？`
+        );
+        
+        if (shouldRestore) {
+          setFormData(prev => ({
+            ...prev,
+            title: draft.title || '',
+            markdown: draft.markdown || '',
+            // content 可以保持不变或置空，因为内容来自markdown
+          }));
+          console.log('✅ 草稿已恢复');
+        } 
+        // else {
+        //   // 用户不想恢复，就清掉它
+        //   localStorage.removeItem('blog_draft');
+        //   console.log('🗑️ 用户选择丢弃草稿');
+        // }
+      } catch (e) {
+        console.error('恢复草稿时出错，数据可能损坏:', e);
+        localStorage.removeItem('blog_draft');
+      }
+    }
     fetchArticles();
   }, []);
 
@@ -85,6 +114,34 @@ function ArticleAdmin() {
   }
   };
 
+  // 1. 保存草稿到“保险箱”（浏览器本地存储）
+  const saveToDraft = () => {
+    // 只有标题或内容有一项不为空，才值得保存
+    if (formData.title.trim() || formData.markdown.trim()) {
+      const draft = {
+        title: formData.title,
+        markdown: formData.markdown,
+        lastSaved: new Date().toLocaleString('zh-CN') // 记录保存时间
+      };
+      // 关键操作：存入“保险箱”，名字叫 'blog_draft'
+      localStorage.setItem('blog_draft', JSON.stringify(draft));
+      console.log('📝 草稿已自动保存');
+    }
+  };
+
+  // 2. “延迟抄写员”（防止打字时频繁保存，造成卡顿）
+  const debouncedSaveDraft = (() => {
+    let timer = null;
+    return () => {
+      if (timer) clearTimeout(timer); // 如果上次的定时还没执行，就取消
+      timer = setTimeout(saveToDraft, 2000); // 等用户停止输入2秒后再保存
+    };
+  })();
+
+  useEffect(()=>{
+    debouncedSaveDraft();
+  },[formData.title, formData.markdown]);
+
   // 创建或更新文章
   const saveArticle = async (e) => {
     e.preventDefault();
@@ -115,7 +172,9 @@ function ArticleAdmin() {
       
       if (result.success) {
         alert(editingId ? '文章更新成功！' : '文章创建成功！');
-        setFormData({ title: '', content: '' });
+
+        localStorage.removeItem('blog_draft');
+        setFormData({title:'',markdown:'',content:''});
         setEditingId(null);
         setAiSuggestion('');
         await fetchArticles(); // 刷新列表
@@ -226,6 +285,59 @@ function ArticleAdmin() {
                 </div>
               )}
             </div>
+
+            {/* 新增：草稿箱控制面板 */}
+            <div className="draft-controls">
+              <h4>📦 草稿箱</h4>
+              <div className="draft-buttons">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const draft = localStorage.getItem('blog_draft');
+                    if (draft) {
+                      if (window.confirm('确定要加载草稿吗？这会覆盖当前未保存的内容。')) {
+                        const parsed = JSON.parse(draft);
+                        setFormData(prev => ({
+                          ...prev,
+                          title: parsed.title,
+                          markdown: parsed.markdown,
+                        }));
+                      }
+                    } else {
+                      alert('草稿箱是空的。');
+                    }
+                  }}
+                  className="btn btn-draft"
+                >
+                  手动恢复草稿
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('确定要清空草稿箱吗？这个操作不能撤销。')) {
+                      localStorage.removeItem('blog_draft');
+                      alert('草稿已清空。');
+                    }
+                  }}
+                  className="btn btn-clear"
+                >
+                  清空草稿箱
+                </button>
+                
+                <button
+                  type="button"
+                  onClick={saveToDraft} // 直接调用前面写的保存函数
+                  className="btn btn-save"
+                >
+                  立即保存草稿
+                </button>
+              </div>
+              <p className="draft-hint">
+                提示：草稿自动保存在你的浏览器本地，清空浏览器数据会导致丢失。
+              </p>
+            </div> 
+
 
             <div className="form-actions">
               <button type="submit" className="btn btn-primary">
